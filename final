@@ -1,0 +1,138 @@
+import ast
+import numpy
+import math
+
+
+
+##respect to Smith-Waterman 
+def point(x, y):
+    return '[' + str(x) + ',' + str(y) + ']'
+
+class CodeVisitor(ast.NodeVisitor):
+    def __init__(self):
+        self.seq = []
+
+    def generic_visit(self, node):
+        ast.NodeVisitor.generic_visit(self, node)
+        self.seq.append(type(node).__name__)
+
+class CalculateSimilarity(object):
+    def __init__(self, A, B, W, M, N):
+        self.A = A
+        self.B = B
+        self.W = W
+        self.M = M
+        self.N = N
+        self.similarity = []
+        self.SimthWaterman(self.A, self.B, self.W)
+
+    def score(self, a, b):
+        if a == b:
+            return self.M
+        else:
+            return self.N
+
+    def traceback(self, A, B, H, path, value, result):
+        if value:
+            temp = value[0]
+            result.append(temp)
+            value = path[temp]
+            x = int((temp.split(',')[0]).strip('['))
+            y = int((temp.split(',')[1]).strip(']'))
+        else:
+            return
+        if H[x, y] == 0:
+            xx = 0
+            yy = 0
+            sim = 0
+            for item in range(len(result) - 2, -1, -1):
+                position = result[item]
+                x = int((position.split(',')[0]).strip('['))
+                y = int((position.split(',')[1]).strip(']'))
+                if x == xx:
+                    pass
+                elif y == yy:
+                    pass
+                else:
+                    sim = sim + 1
+                xx = x
+                yy = y
+            self.similarity.append(sim * 2 / (len(A) + len(B)))
+
+        else:
+            self.traceback(A, B, H, path, value, result)
+
+    def SimthWaterman(self, A, B, W):  ## 史密斯，沃夫曼算法的
+        n, m = len(A), len(B)
+        H = numpy.zeros([n + 1, m + 1], int)
+        path = {}
+        for i in range(0, n + 1):
+            for j in range(0, m + 1):
+                if i == 0 or j == 0:
+                    path[point(i, j)] = []
+                else:##smith waterman algorithm
+                    s = self.score(A[i - 1], B[j - 1])
+                    L = H[i - 1, j - 1] + s
+                    P = H[i - 1, j] - W
+                    Q = H[i, j - 1] - W
+                    H[i, j] = max(L, P, Q, 0)
+
+                    path[point(i, j)] = []
+                    if math.floor(L) == H[i, j]:
+                        path[point(i, j)].append(point(i - 1, j - 1))
+                    if math.floor(P) == H[i, j]:
+                        path[point(i, j)].append(point(i - 1, j))
+                    if math.floor(Q) == H[i, j]:
+                        path[point(i, j)].append(point(i, j - 1))
+
+        end = numpy.argwhere(H == numpy.max(H))
+        for pos in end:
+            key = point(pos[0], pos[1])
+            value = path[key]
+            result = [key]
+            self.traceback(A, B, H, path, value, result)
+
+    def Answer(self):
+        return sum(self.similarity) / len(self.similarity)
+
+
+def main():
+    # 存储要比较的多个代码文件的文件名
+    code_files = ['code1.py', 'code2.py', 'code3.py']
+
+    # 存储每个代码文件的AST序列
+    ast_sequences = []
+
+    # 遍历每个代码文件，解析AST，并存储在 ast_sequences 中
+    for code_file in code_files:
+        with open(code_file, 'r') as file:
+            code = file.read()
+            AST = CodeVisitor()
+            AST.visit(ast.parse(code))
+            ast_sequences.append(AST.seq)
+
+    # 使用第一个代码作为基准，与其他代码进行比较
+    reference_sequence = ast_sequences[0]
+
+    # 存储相似性得分的列表
+    similarity_scores = []
+
+    # 遍历除了第一个代码外的其他代码
+    for seq in ast_sequences[1:]:
+        RES = CalculateSimilarity(reference_sequence, seq, 1, 1, -1/3)
+        similarity_scores.append(RES.Answer())
+
+    # 检查是否有相似的代码
+    similar_found = False
+    for i, score in enumerate(similarity_scores):
+        if score == 1:
+            similar_found = True
+            print(f"代码 {code_files[i+1]} 与基准代码相似")
+            # 如果找到相似的代码，可以选择终止循环或继续查找
+
+    # 如果没有相似的代码
+    if not similar_found:
+        print("没有找到与基准代码相似的其他代码")
+
+if __name__ == "__main__":
+    main()
